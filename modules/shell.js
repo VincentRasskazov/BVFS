@@ -2,25 +2,29 @@ import { initVFS, writeFile } from './vfs.js';
 import { ENV } from './env.js';
 import { parseCommand } from './parser.js';
 import { commands as fsCommands } from './commands/builtin-fs.js';
+import { extendedCommands } from './commands/builtin-extended.js';
 import { resolvePath } from './path.js';
+import { loadHistory, pushHistory, getPrevious, getNext } from './history.js';
 
-const registry = { ...fsCommands };
+// Merge all commands into one registry
+const registry = { ...fsCommands, ...extendedCommands };
+
 const ui = {
     output: document.getElementById('output'),
     input: document.getElementById('cmd-input'),
     prompt: document.getElementById('prompt')
 };
 
-async function initShell() {
-    print("BVFS Kernel v1.0.0 initializing...\nMounting OPFS... ");
+export async function initShell() {
+    print("BVFS Kernel v1.1.0 initializing...\nMounting OPFS... ");
     try {
         await initVFS();
+        loadHistory(); // Load history from localStorage
         print("Done.\n\n");
     } catch (e) { return print(`FAILED: ${e.message}\n`, true); }
     
     updatePrompt();
     ui.input.addEventListener('keydown', handleInput);
-    // Keep focus on input
     document.addEventListener('click', () => ui.input.focus());
 }
 
@@ -35,13 +39,25 @@ function print(text, isErr = false) {
 }
 
 async function handleInput(e) {
+    if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        ui.input.value = getPrevious();
+        return;
+    }
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        ui.input.value = getNext();
+        return;
+    }
     if (e.key !== 'Enter') return;
+    
     const cmdStr = ui.input.value.trim();
     ui.input.value = '';
     
     print(`${ui.prompt.innerText}${cmdStr}\n`);
     if (!cmdStr) return;
 
+    pushHistory(cmdStr); // Save command to history
     await executePipeline(parseCommand(cmdStr));
     updatePrompt();
 }
@@ -74,5 +90,3 @@ async function executePipeline(pipeline) {
         }
     }
 }
-
-document.addEventListener('DOMContentLoaded', initShell);
