@@ -188,7 +188,6 @@ const commands = {
         try { await commands.cp([args[0], args[1]], io); await commands.rm([args[0]], io); } catch { io.stderr(`mv: error moving\n`); }
     },
 
-    // Text tools
     grep: async (args, io) => {
         if (!args[0]) return io.stderr("grep: missing pattern\n");
         const r = new RegExp(args[0]);
@@ -295,6 +294,22 @@ const commands = {
                 if (line && !line.startsWith('#')) await executeInternal(line, true);
             }
         } catch { io.stderr(`sh: ${args[0]}: No such file\n`); }
+    },
+
+    wget: async (args, io) => {
+        if (args.length < 2) return io.stderr("wget: missing URL or output file\nUsage: wget <url> <output>\n");
+        try {
+            io.stdout(`Fetching ${args[0]}...\n`);
+            const res = await fetch(args[0]);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const buffer = await res.arrayBuffer();
+            
+            const handle = await getHandle(resolvePath(args[1]), true, true);
+            const writable = await handle.createWritable();
+            await writable.write(buffer);
+            await writable.close();
+            io.stdout(`Saved to ${args[1]}\n`);
+        } catch (e) { io.stderr(`wget: error - ${e.message}\n`); }
     }
 };
 
@@ -315,6 +330,7 @@ async function executeInternal(input, silentPrompt = false) {
     if (!silentPrompt) print(`${ui.prompt.innerText}${input}\n`);
     if (!input.trim()) return;
 
+    // Background job handling
     const isBackground = input.trim().endsWith('&');
     if (isBackground) input = input.replace(/&\s*$/, '');
 
@@ -326,6 +342,7 @@ async function executeInternal(input, silentPrompt = false) {
             let cmdObj = pipeline[i];
             let name = cmdObj.args.shift();
             
+            // Resolve Alias
             if (aliases[name]) {
                 const aliasTokens = parseCommand(aliases[name])[0].args;
                 name = aliasTokens.shift();
@@ -336,27 +353,13 @@ async function executeInternal(input, silentPrompt = false) {
             const io = { stdin: prevOut, stdout: (t) => currOut += t, stderr: (t) => print(t, true), clear: () => ui.out.innerHTML = '' };
             
             if (commands[name]) {
-                // Run our native JS commands (cd, ls, history, etc.)
                 await commands[name](cmdObj.args, io);
             } else {
-                // WASM / BUSYBOX FALLBACK
+                // If the command doesn't exist, check if a WASM file exists in the directory
                 try {
-                    // First, try to run it as a standalone .wasm file if specified
-                    let targetPath = name.endsWith('.wasm') ? resolvePath(name) : null;
-                    let handle;
-                    
-                    if (targetPath) {
-                        handle = await getHandle(targetPath, false, true);
-                        await runWasm(handle, cmdObj.args, io);
-                    } else {
-                        // If not explicitly a .wasm file, route it through BusyBox
-                        // e.g., typing 'awk' actually runs 'busybox.wasm awk'
-                        handle = await getHandle('/bin/busybox.wasm', false, true);
-                        await runWasm(handle, [name, ...cmdObj.args], io);
-                    }
-                } catch { 
-                    print(`bvfs: ${name}: command not found\n`, true); break; 
-                }
+                    const handle = await getHandle(resolvePath(name.endsWith('.wasm') ? name : `${name}.wasm`), false, true);
+                    await runWasm(handle, cmdObj.args, io);
+                } catch { print(`bvfs: ${name}: command not found\n`, true); break; }
             }
 
             if (cmdObj.redirectOut) {
@@ -398,8 +401,8 @@ async function execute(input) {
 }
 
 window.onload = async () => {
-    print("BVFS Micro-Kernel v4.0 TITAN initializing...\n");
-    try { await initVFS(); print("OPFS Mounted. VFS Router Active. WASM Runtime Ready.\n\n"); } 
+    print("BVFS Micro-Kernel v4.1 TITAN initializing...\n");
+    try { await initVFS(); print("OPFS Mounted. VFS Router Active. WASM Runtime Ready. Network Ready.\n\n"); } 
     catch (e) { print(`VFS Error: ${e.message}\n`, true); }
     
     ui.prompt.innerText = `${ENV.USER}@bvfs:${ENV.PWD}$ `;
