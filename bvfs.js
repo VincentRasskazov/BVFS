@@ -1,7 +1,7 @@
 // ==========================================
 // 1. STATE & ENVIRONMENT
 // ==========================================
-export const ENV = { USER: 'guest', HOME: '/home/guest', PWD: '/home/guest' };
+export const ENV = { USER: 'guest', HOME: '/home/guest', PWD: '/home/guest', PATH: '/bin' };
 let opfsRoot;
 let history = JSON.parse(localStorage.getItem('bvfs_hist') || '[]');
 let histCursor = history.length;
@@ -49,14 +49,22 @@ async function getHandle(path, create = false, isFile = false) {
 // ==========================================
 // 3. PARSER & COMMANDS
 // ==========================================
+function expandEnv(str) {
+    return str.replace(/\$(\w+)/g, (_, key) => ENV[key] !== undefined ? ENV[key] : '');
+}
+
 function parseCommand(input) {
     const tokens = input.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
     let pipeline = [], cmd = { args: [], redirectOut: null, append: false };
     for (let i = 0; i < tokens.length; i++) {
+        // Strip quotes and expand variables if not in single quotes
+        let isSingleQuote = tokens[i].startsWith("'");
         let t = tokens[i].replace(/^["']|["']$/g, '');
+        if (!isSingleQuote) t = expandEnv(t);
+
         if (t === '|') { pipeline.push(cmd); cmd = { args: [], redirectOut: null, append: false }; }
-        else if (t === '>') cmd.redirectOut = tokens[++i];
-        else if (t === '>>') { cmd.append = true; cmd.redirectOut = tokens[++i]; }
+        else if (t === '>') cmd.redirectOut = expandEnv(tokens[++i].replace(/^["']|["']$/g, ''));
+        else if (t === '>>') { cmd.append = true; cmd.redirectOut = expandEnv(tokens[++i].replace(/^["']|["']$/g, '')); }
         else cmd.args.push(t);
     }
     pipeline.push(cmd);
@@ -64,12 +72,21 @@ function parseCommand(input) {
 }
 
 const commands = {
+    help: async (args, io) => io.stdout(`Available commands:\n  ${Object.keys(commands).sort().join('\n  ')}\n`),
     pwd: async (args, io) => io.stdout(ENV.PWD + '\n'),
     clear: async (args, io) => io.clear(),
     echo: async (args, io) => io.stdout(args.join(' ') + '\n'),
     whoami: async (args, io) => io.stdout(ENV.USER + '\n'),
     date: async (args, io) => io.stdout(new Date().toString() + '\n'),
     history: async (args, io) => io.stdout(history.map((c, i) => `  ${i + 1}  ${c}`).join('\n') + '\n'),
+    env: async (args, io) => io.stdout(Object.entries(ENV).map(([k, v]) => `${k}=${v}`).join('\n') + '\n'),
+    
+    export: async (args, io) => {
+        args.forEach(arg => {
+            let [k, v] = arg.split('=');
+            if (k && v !== undefined) ENV[k] = v;
+        });
+    },
     
     cd: async (args, io) => {
         const target = resolvePath(args[0] || ENV.HOME);
@@ -80,8 +97,9 @@ const commands = {
         try {
             const dir = await getHandle(resolvePath(args[0] || '.'));
             let out = [];
-            for await (const [name, handle] of dir.entries()) out.push(handle.kind === 'directory' ? `${name}/` : name);
-            if (out.length) io.stdout(out.join('  ') + '\n');
+            for await (const [name, handle] of dir.entries()) out.push(handle.kind === 'directory' ? `\x1b[1;34m${name}/\x1b[0m` : name);
+            // Quick ANSI strip for basic UI, or keep for future ANSI renderer
+            if (out.length) io.stdout(out.map(s => s.replace(/\x1b\[[0-9;]*m/g, '')).join('  ') + '\n');
         } catch { io.stderr(`ls: cannot access\n`); }
     },
     
@@ -117,6 +135,26 @@ const commands = {
         } catch { io.stderr(`rm: cannot remove '${args[0]}': No such file or directory\n`); }
     },
 
+    cp: async (args, io) => {
+        if (args.length < 2) return io.stderr("cp: missing file operand\n");
+        try {
+            const srcHandle = await getHandle(resolvePath(args[0]), false, true);
+            const text = await (await srcHandle.getFile()).text();
+            const destHandle = await getHandle(resolvePath(args[1]), true, true);
+            const writable = await destHandle.createWritable();
+            await writable.write(text);
+            await writable.close();
+        } catch { io.stderr(`cp: cannot stat '${args[0]}': No such file\n`); }
+    },
+
+    mv: async (args, io) => {
+        if (args.length < 2) return io.stderr("mv: missing file operand\n");
+        try {
+            await commands.cp([args[0], args[1]], io);
+            await commands.rm([args[0]], io);
+        } catch { io.stderr(`mv: error moving file\n`); }
+    },
+
     grep: async (args, io) => {
         if (!args[0]) return io.stderr("grep: missing pattern\n");
         const regex = new RegExp(args[0]);
@@ -145,32 +183,6 @@ const commands = {
             const h = await getHandle(resolvePath(args[0]), false, true);
             processStr(await (await h.getFile()).text(), args[0]);
         } catch { io.stderr(`wc: ${args[0]}: No such file\n`); }
-    },
-
-    head: async (args, io) => {
-        const n = 10; // simplified for now
-        const processStr = (str) => io.stdout(str.split('\n').slice(0, n).join('\n') + '\n');
-        if (io.stdin) return processStr(io.stdin);
-        if (!args[0]) return;
-        try {
-            const h = await getHandle(resolvePath(args[0]), false, true);
-            processStr(await (await h.getFile()).text());
-        } catch { io.stderr(`head: ${args[0]}: No such file\n`); }
-    },
-
-    tail: async (args, io) => {
-        const n = 10;
-        const processStr = (str) => {
-            let lines = str.split('\n');
-            if (str.endsWith('\n')) lines.pop();
-            io.stdout(lines.slice(-n).join('\n') + '\n');
-        };
-        if (io.stdin) return processStr(io.stdin);
-        if (!args[0]) return;
-        try {
-            const h = await getHandle(resolvePath(args[0]), false, true);
-            processStr(await (await h.getFile()).text());
-        } catch { io.stderr(`tail: ${args[0]}: No such file\n`); }
     }
 };
 
@@ -191,7 +203,6 @@ async function execute(input) {
     print(`${ui.prompt.innerText}${input}\n`);
     if (!input.trim()) return;
 
-    // History tracking
     if (history[history.length - 1] !== input) {
         history.push(input);
         if (history.length > 500) history.shift();
@@ -225,13 +236,12 @@ async function execute(input) {
             prevOut = currOut;
         }
     }
-    // Only print if there is output and it wasn't redirected
     if (prevOut && !pipeline[pipeline.length - 1].redirectOut) print(prevOut);
 }
 
 window.onload = async () => {
-    print("BVFS Micro-Kernel v2.1 initializing...\n");
-    try { await initVFS(); print("OPFS Mounted. Type 'help' to see commands (coming soon).\n\n"); } catch (e) { print(`VFS Error: ${e.message}\n`, true); }
+    print("BVFS Micro-Kernel v2.2 initializing...\n");
+    try { await initVFS(); print("OPFS Mounted. Type 'help' to see commands.\n\n"); } catch (e) { print(`VFS Error: ${e.message}\n`, true); }
     
     ui.prompt.innerText = `${ENV.USER}@bvfs:${ENV.PWD}$ `;
     
