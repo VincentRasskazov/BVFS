@@ -3,26 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BVFS - Terminal</title>
-    <link rel="stylesheet" href="styles/main.css">
+    <title>BVFS - Micro Kernel</title>
+    <style>
+        :root { --bg: #0f172a; --fg: #e2e8f0; --prompt: #22c55e; --err: #ef4444; --font: 'Menlo', 'Courier New', monospace; }
+        body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; }
+        #terminal { display: flex; flex-direction: column; height: 100%; padding: 10px; box-sizing: border-box; }
+        #output { flex-grow: 1; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; }
+        .out-err { color: var(--err); }
+        #input-line { display: flex; align-items: center; margin-top: 5px; }
+        #prompt { color: var(--prompt); margin-right: 8px; font-weight: bold; white-space: pre; }
+        #cmd-input { flex-grow: 1; background: transparent; border: none; color: inherit; font-family: inherit; font-size: inherit; outline: none; }
+    </style>
 </head>
 <body>
-    <div id="app">
-        <aside id="sidebar">
-            <div class="panel-header">BVFS Mounts</div>
-            <div id="mounts-list">
-                <div>[OPFS] /</div>
-                <div>[VDEV] /dev</div>
-            </div>
-        </aside>
-        <main id="terminal">
-            <div id="output"></div>
-            <div id="input-line">
-                <span id="prompt"></span>
-                <input type="text" id="cmd-input" autocomplete="off" spellcheck="false" autofocus>
-            </div>
-        </main>
+    <div id="terminal">
+        <div id="output"></div>
+        <div id="input-line">
+            <span id="prompt"></span>
+            <input type="text" id="cmd-input" autocomplete="off" spellcheck="false" autofocus>
+        </div>
     </div>
-    <script type="module" src="./modules/shell.js"></script>
+    <script type="module" src="./bvfs.js"></script>
 </body>
 </html>
