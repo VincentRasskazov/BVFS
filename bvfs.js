@@ -315,7 +315,6 @@ async function executeInternal(input, silentPrompt = false) {
     if (!silentPrompt) print(`${ui.prompt.innerText}${input}\n`);
     if (!input.trim()) return;
 
-    // Background job handling
     const isBackground = input.trim().endsWith('&');
     if (isBackground) input = input.replace(/&\s*$/, '');
 
@@ -327,7 +326,6 @@ async function executeInternal(input, silentPrompt = false) {
             let cmdObj = pipeline[i];
             let name = cmdObj.args.shift();
             
-            // Resolve Alias
             if (aliases[name]) {
                 const aliasTokens = parseCommand(aliases[name])[0].args;
                 name = aliasTokens.shift();
@@ -338,12 +336,27 @@ async function executeInternal(input, silentPrompt = false) {
             const io = { stdin: prevOut, stdout: (t) => currOut += t, stderr: (t) => print(t, true), clear: () => ui.out.innerHTML = '' };
             
             if (commands[name]) {
+                // Run our native JS commands (cd, ls, history, etc.)
                 await commands[name](cmdObj.args, io);
             } else {
+                // WASM / BUSYBOX FALLBACK
                 try {
-                    const handle = await getHandle(resolvePath(name.endsWith('.wasm') ? name : `${name}.wasm`), false, true);
-                    await runWasm(handle, cmdObj.args, io);
-                } catch { print(`bvfs: ${name}: command not found\n`, true); break; }
+                    // First, try to run it as a standalone .wasm file if specified
+                    let targetPath = name.endsWith('.wasm') ? resolvePath(name) : null;
+                    let handle;
+                    
+                    if (targetPath) {
+                        handle = await getHandle(targetPath, false, true);
+                        await runWasm(handle, cmdObj.args, io);
+                    } else {
+                        // If not explicitly a .wasm file, route it through BusyBox
+                        // e.g., typing 'awk' actually runs 'busybox.wasm awk'
+                        handle = await getHandle('/bin/busybox.wasm', false, true);
+                        await runWasm(handle, [name, ...cmdObj.args], io);
+                    }
+                } catch { 
+                    print(`bvfs: ${name}: command not found\n`, true); break; 
+                }
             }
 
             if (cmdObj.redirectOut) {
