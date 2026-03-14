@@ -37,3 +37,100 @@ python3 -m http.server 8000
 
 # Using Node.js
 npx http-server
+```
+Then navigate to `http://localhost:8000`.
+
+---
+
+## 🛠️ Supported Commands
+
+BVFS currently supports **30+ native shell utilities**.
+
+### File & Directory Management
+* `ls` - List directory contents.
+* `cd <path>` - Change directory.
+* `pwd` - Print working directory.
+* `mkdir <dir>` - Create a new directory.
+* `touch <file>` - Create an empty file.
+* `rm <path>` - Remove files or directories (recursive).
+* `cp <src> <dest>` - Copy a file.
+* `mv <src> <dest>` - Move or rename a file.
+* `find <dir>` - Recursively list all files in a directory tree.
+* `stat <file>` - Display file metadata (size, timestamps).
+
+### Text & Data Processing
+* `cat <file>` - Print file contents.
+* `echo <text>` - Print text to standard output.
+* `grep <pattern> <file>` - Search for regex patterns in text.
+* `sort <file>` - Sort lines of text alphabetically.
+* `uniq <file>` - Filter out adjacent duplicate lines.
+* `tr <search> <replace>` - Translate or replace characters.
+* `base64 [-d] <file>` - Encode or decode base64 strings.
+* `xxd <file>` - Generate a hex dump of a binary file.
+
+### System & Environment
+* `help` - List all available commands.
+* `clear` - Clear the terminal screen.
+* `history` - View command history.
+* `whoami` - Print the current user.
+* `date` - Print the current date and time.
+* `env` - List all environment variables.
+* `export KEY=value` - Set an environment variable.
+* `alias name='cmd'` - Create a command shortcut.
+* `unalias name` - Remove a shortcut.
+
+### Networking & Mounts
+* `wget <url> <output>` - Download a file from the web to the VFS.
+* `df` - Show mounted filesystems.
+* `mount local <path>` - Prompt the user to map a real host folder into the VFS.
+* `umount <path>` - Unmount a filesystem.
+
+### Job Control & Scripting
+* `sh <script.sh>` - Execute a shell script.
+* `sleep <seconds>` - Delay execution.
+* `jobs` - List active background jobs.
+
+---
+
+## 💡 Advanced Usage Examples
+
+**1. Data Pipelines**
+You can pipe commands together just like a real Linux shell:
+```bash
+echo -e "apple\nbanana\napple" | sort | uniq | grep "a" > fruits.txt
+```
+
+**2. Downloading & Executing WebAssembly**
+You can fetch a `.wasm` file from a remote server and run it locally:
+```bash
+# Download a WASM binary
+wget https://example.com/hello.wasm /bin/hello.wasm
+
+# Execute it
+hello
+```
+
+**3. Running Background Tasks**
+Append `&` to run tasks asynchronously:
+```bash
+sleep 10 &
+jobs
+```
+
+**4. Mounting Your Real Hard Drive**
+Gain read/write access to a real folder on your computer:
+```bash
+mkdir /mnt/local
+mount local /mnt/local
+cd /mnt/local
+ls
+```
+
+---
+
+## 🏗️ Architecture
+
+* **`index.html`**: The UI shell and CSS styling.
+* **`bvfs.js`**: The monolithic micro-kernel containing the VFS router, the shell parser (handling quotes, variables, piping, and redirection), and the native command implementations. 
+
+No external dependencies, frameworks, or libraries are used.
