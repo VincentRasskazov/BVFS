@@ -55,3 +55,17 @@ export async function readFile(path) {
     const file = await fileHandle.getFile();
     return await file.text();
 }
+
+
+
+export async function makeDir(path) {
+    if (path === '/') throw new Error("Permission denied");
+    const parentHandle = await getHandle(dirname(path));
+    await parentHandle.getDirectoryHandle(basename(path), { create: true });
+}
+
+export async function remove(path) {
+    if (path === '/') throw new Error("Permission denied: Cannot remove root");
+    const parentHandle = await getHandle(dirname(path));
+    await parentHandle.removeEntry(basename(path), { recursive: true });
+}
