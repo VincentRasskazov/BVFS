@@ -1,9 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BVFS - Micro Kernel</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <title>BVFS - Web-Based Micro Kernel & Terminal</title>
+    <meta name="title" content="BVFS - Web-Based Micro Kernel & Terminal" />
+    <meta name="description" content="BVFS is a browser-based micro-kernel and terminal environment utilizing WebAssembly (WASM) and the Origin Private File System (OPFS)." />
+    <meta name="author" content="Vincent Rasskazov" />
+
+    <link rel="canonical" href="https://vincentrasskazov.github.io/BVFS/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://vincentrasskazov.github.io/BVFS/" />
+    <meta property="og:title" content="BVFS - Web-Based Micro Kernel" />
+    <meta property="og:description" content="A browser-based micro-kernel and terminal environment utilizing WebAssembly and OPFS." />
+
     <style>
         :root { --bg: #0f172a; --fg: #e2e8f0; --prompt: #22c55e; --err: #ef4444; --font: 'Menlo', 'Courier New', monospace; }
         body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; }
@@ -13,16 +25,31 @@
         #input-line { display: flex; align-items: center; margin-top: 5px; }
         #prompt { color: var(--prompt); margin-right: 8px; font-weight: bold; white-space: pre; }
         #cmd-input { flex-grow: 1; background: transparent; border: none; color: inherit; font-family: inherit; font-size: inherit; outline: none; }
+        
+        /* SEO & Accessibility helper: Hides text visually but lets Googlebot read it */
+        .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0; }
     </style>
 </head>
 <body>
-    <div id="terminal">
-        <div id="output"></div>
+    <header class="sr-only">
+        <h1>BVFS Micro-Kernel and Web Terminal</h1>
+        <p>Welcome to BVFS. This application requires JavaScript and WebAssembly to run a virtual file system and terminal interface directly in your browser.</p>
+    </header>
+
+    <main id="terminal">
+        <div id="output"><span>BVFS Micro-Kernel v4.1 TITAN initializing...<br /></span><span>OPFS Mounted. VFS Router Active. WASM Runtime Ready. Network Ready.<br /><br /></span></div>
         <div id="input-line">
-            <span id="prompt"></span>
-            <input type="text" id="cmd-input" autocomplete="off" spellcheck="false" autofocus>
+            <span id="prompt">guest@bvfs:/home/guest$ </span>
+            <input type="text" id="cmd-input" autocomplete="off" spellcheck="false" autofocus="" aria-label="Terminal command input" />
         </div>
-    </div>
+    </main>
+
+    <noscript>
+        <div style="padding: 20px; color: var(--prompt);">
+            <p><strong>Notice:</strong> JavaScript and WebAssembly are required to boot the BVFS Micro-Kernel. Please enable scripts to use the terminal.</p>
+        </div>
+    </noscript>
+
     <script type="module" src="./bvfs.js"></script>
 </body>
 </html>
